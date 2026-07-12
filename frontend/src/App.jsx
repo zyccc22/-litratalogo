@@ -31,12 +31,31 @@ export default function App() {
   }, [])
 
   async function fetchProfile(userId) {
-    const { data, error } = await supabase
+    let { data, error } = await supabase
       .from('profiles')
       .select('*')
       .eq('id', userId)
-      .single()
-    if (!error) setProfile(data)
+      .maybeSingle()
+    if (!data && !error) {
+      const { data: { user } } = await supabase.auth.getUser()
+      const meta = user?.user_metadata || {}
+      const { data: newProfile } = await supabase
+        .from('profiles')
+        .insert({
+          id: userId,
+          full_name: meta.full_name || user?.email || 'User',
+          username: meta.username || user?.email?.split('@')[0] || 'user',
+          contact_number: meta.contact_number || '',
+          role: meta.role || 'shooter',
+          category: meta.category || 'photographer',
+          experience_level: meta.experience_level || 'amateur',
+          is_public: false
+        })
+        .select()
+        .single()
+      data = newProfile
+    }
+    if (data) setProfile(data)
     setLoading(false)
   }
 
